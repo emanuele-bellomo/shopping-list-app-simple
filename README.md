@@ -1,6 +1,6 @@
 # Simple Shopping List App
 
-[Visit the app here](https://emanuele-bellomo.github.io/shopping-list-app-simple) (hosted with GitHub Pages)
+<a href="https://emanuele-bellomo.github.io/shopping-list-app-simple" target="_blank">Visit the app here</a>
 
 A simple shopping list app with no unnecessary features, no bloat and no premium subscriptions
 
