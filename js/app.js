@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             span.textContent = list.name;
             span.className = 'list-name';
             // Click to activate list
-            span.addEventListener('click', () => {
+            li.addEventListener('click', () => {
                 activeListId = list.id;
                 Store.setActiveListId(activeListId);
                 renderLists();
