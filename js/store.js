@@ -81,6 +81,18 @@ const Store = (function() {
         },
 
         /**
+         * Rename a list by ID
+         */
+        renameList: function(id, newName) {
+            const data = getData();
+            const list = data.lists.find(l => l.id === id);
+            if (list) {
+                list.name = newName;
+                saveData(data);
+            }
+        },
+
+        /**
          * Delete a list by ID
          */
         deleteList: function(id) {
@@ -118,6 +130,21 @@ const Store = (function() {
                 };
                 list.items.push(item);
                 saveData(data);
+            }
+        },
+
+        /**
+         * Rename an item
+         */
+        renameItem: function(listId, itemId, newName) {
+            const data = getData();
+            const list = data.lists.find(l => l.id === listId);
+            if (list) {
+                const item = list.items.find(i => i.id === itemId);
+                if (item) {
+                    item.name = newName;
+                    saveData(data);
+                }
             }
         },
 

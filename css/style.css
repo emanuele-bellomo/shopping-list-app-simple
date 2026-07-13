@@ -129,6 +129,7 @@ button:active {
 
 #add-list-form input, #add-item-form input {
     flex: 1;
+    min-width: 0;
 }
 
 /* Sidebar */

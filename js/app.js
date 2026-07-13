@@ -25,6 +25,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemsContainer = document.getElementById('items-container');
     const emptyState = document.getElementById('empty-state');
 
+    // Header Actions
+    const headerActions = document.getElementById('header-actions');
+    const headerSpacer = document.getElementById('header-spacer');
+    const renameListBtn = document.getElementById('rename-list-btn');
+    const copyListBtn = document.getElementById('copy-list-btn');
+    const shareListBtn = document.getElementById('share-list-btn');
+
     // === Application State ===
     let activeListId = Store.getActiveListId();
     let deferredPrompt; // For PWA install prompt
@@ -172,10 +179,14 @@ document.addEventListener('DOMContentLoaded', () => {
             itemsContainer.innerHTML = '';
             emptyState.classList.remove('hidden');
             emptyState.querySelector('p').textContent = 'No list selected.';
+            if (headerActions) headerActions.style.display = 'none';
+            if (headerSpacer) headerSpacer.style.display = 'block';
             return;
         }
 
         currentListTitle.textContent = activeList.name;
+        if (headerActions) headerActions.style.display = 'flex';
+        if (headerSpacer) headerSpacer.style.display = 'none';
         addItemForm.classList.remove('hidden');
         
         const items = Store.getItems(activeListId);
@@ -213,6 +224,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderActiveList();
                 });
 
+                // Edit Button
+                const editBtn = document.createElement('button');
+                editBtn.className = 'icon-btn';
+                editBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+                editBtn.setAttribute('aria-label', 'Edit item');
+                editBtn.addEventListener('click', () => {
+                    const newName = prompt('Rename item:', item.name);
+                    if (newName !== null && newName.trim() !== '') {
+                        Store.renameItem(activeListId, item.id, newName.trim());
+                        renderActiveList();
+                    }
+                });
+
                 // Delete Button
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'icon-btn danger';
@@ -225,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 li.appendChild(checkbox);
                 li.appendChild(span);
+                li.appendChild(editBtn);
                 li.appendChild(deleteBtn);
                 itemsContainer.appendChild(li);
             });
@@ -258,6 +283,72 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderActiveList();
             }
         });
+
+        // Header Actions Listeners
+        if (renameListBtn) {
+            renameListBtn.addEventListener('click', () => {
+                const lists = Store.getLists();
+                const activeList = lists.find(l => l.id === activeListId);
+                if (activeList) {
+                    const newName = prompt('Rename list:', activeList.name);
+                    if (newName !== null && newName.trim() !== '') {
+                        Store.renameList(activeListId, newName.trim());
+                        renderLists();
+                        renderActiveList();
+                    }
+                }
+            });
+        }
+
+        if (copyListBtn) {
+            copyListBtn.addEventListener('click', () => {
+                const lists = Store.getLists();
+                const activeList = lists.find(l => l.id === activeListId);
+                if (activeList) {
+                    const items = Store.getItems(activeListId);
+                    let listText = activeList.name + '\n\n';
+                    items.forEach(item => {
+                        listText += (item.completed ? '[x] ' : '[ ] ') + item.name + '\n';
+                    });
+                    navigator.clipboard.writeText(listText).then(() => {
+                        alert('List copied to clipboard!');
+                    }).catch(err => {
+                        console.error('Could not copy text: ', err);
+                        alert('Failed to copy list.');
+                    });
+                }
+            });
+        }
+
+        if (shareListBtn) {
+            shareListBtn.addEventListener('click', async () => {
+                const lists = Store.getLists();
+                const activeList = lists.find(l => l.id === activeListId);
+                if (activeList) {
+                    const items = Store.getItems(activeListId);
+                    let listText = activeList.name + '\n\n';
+                    items.forEach(item => {
+                        listText += (item.completed ? '[x] ' : '[ ] ') + item.name + '\n';
+                    });
+                    
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({
+                                title: activeList.name,
+                                text: listText,
+                            });
+                        } catch (err) {
+                            console.error('Error sharing:', err);
+                        }
+                    } else {
+                        // Fallback
+                        navigator.clipboard.writeText(listText).then(() => {
+                            alert('Share not supported on this browser. List copied to clipboard instead!');
+                        });
+                    }
+                }
+            });
+        }
 
         // Mobile Sidebar Toggles
         menuBtn.addEventListener('click', openSidebar);
