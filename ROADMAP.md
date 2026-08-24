@@ -8,6 +8,9 @@
    - *Note: To implement this feature without frameworks, I could create a simple translation dictionary object mapping keys to English and Italian strings. I would use `navigator.language` to detect the user's browser language on load and default to Italian if it detects "it". Then, I'd apply translations dynamically by updating the `textContent` of elements based on custom `data-i18n` attributes.*
 7. Wrap it with PWABuilder
 
+Feature ideas:
+- "Export all my lists" button
+
 Bugs found:
 - (FIXED) When a user has multiple lists they can only switch from list to list by clicking the list's name, when they should be able to switch by clicking on the whole list tab to avoid confusion.
 
