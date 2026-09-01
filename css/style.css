@@ -37,14 +37,21 @@ body {
     color: var(--text-primary);
     line-height: 1.5;
     /* Prevent pull-to-refresh on mobile if possible */
-    overscroll-behavior-y: none; 
+    overscroll-behavior-y: none;
+    /* One column: the install banner on top, the app filling whatever is left */
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh; /* Mobile friendly viewport height */
+    overflow: hidden;
 }
 
 /* App Layout Container */
 .app-container {
     display: flex;
-    height: 100vh;
-    height: 100dvh; /* Mobile friendly viewport height */
+    flex: 1;
+    min-height: 0; /* Lets the flex child shrink so its own children can scroll */
+    position: relative; /* Anchors the absolutely positioned mobile sidebar */
     overflow: hidden;
 }
 
@@ -87,6 +94,15 @@ button:active {
     transform: scale(0.95);
 }
 
+button:disabled {
+    cursor: default;
+    opacity: 0.4;
+}
+
+button:disabled:active {
+    transform: none;
+}
+
 .primary-btn {
     background-color: var(--accent-primary);
     color: white;
@@ -118,6 +134,27 @@ button:active {
 
 .icon-btn.danger:hover {
     color: var(--accent-danger);
+}
+
+/* Full-width, quiet button used for the sidebar's list-wide actions */
+.secondary-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--border-radius);
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color var(--transition-speed), color var(--transition-speed);
+}
+
+.secondary-btn:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
 }
 
 /* Forms */
@@ -175,10 +212,25 @@ button:active {
     color: var(--text-primary);
 }
 
+/* Keep long list names on one line instead of pushing the delete button around */
+.list-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .lists-container li.active {
     background-color: rgba(99, 102, 241, 0.1);
     color: var(--accent-primary);
     border-right: 3px solid var(--accent-primary);
+}
+
+.sidebar-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 /* Main Content */
@@ -195,6 +247,12 @@ button:active {
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--border-color);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .header-spacer {
@@ -308,28 +366,31 @@ button:active {
     margin-top: 0.5rem;
 }
 
-/* Install Banner */
+/*
+ * Install Banner
+ *
+ * It collapses to zero height rather than using the .hidden utility class, so it
+ * can animate open and closed while still taking up no room when it is away.
+ * The `visible` modifier (not `hidden`) keeps it clear of that utility class.
+ */
 .install-banner {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
+    flex-shrink: 0;
     background-color: var(--accent-primary);
     color: white;
-    z-index: 50;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 1.5rem;
+    gap: 1rem;
+    max-height: 0;
+    padding: 0 1.5rem;
+    overflow: hidden;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    transform: translateY(0);
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.install-banner.hidden {
-    display: flex !important; /* Override the default hidden behavior to allow transform animation */
-    transform: translateY(-100%);
-    pointer-events: none;
+.install-banner.visible {
+    max-height: 8rem; /* Comfortably above the real height, even when the text wraps */
+    padding: 0.75rem 1.5rem;
 }
 
 .banner-content {

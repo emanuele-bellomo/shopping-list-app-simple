@@ -1,91 +1,100 @@
 /**
  * store.js - Handles all data persistence exclusively through localStorage.
- * 
+ *
  * Educational Note: This module abstracts localStorage interaction so the main app
  * doesn't need to know *how* data is stored, just *what* to store.
- * We use JSON.stringify() to convert JS objects to strings for localStorage,
- * and JSON.parse() to convert strings back into JS objects when retrieving.
+ * localStorage can only hold strings, so we use JSON.stringify() on the way in and
+ * JSON.parse() on the way out to move whole JavaScript objects in and out of it.
  */
 
-const Store = (function() {
+const Store = (function () {
     const STORAGE_KEY = 'shopping_list_data';
 
-    // Default structure if localStorage is empty
-    const defaultData = {
-        lists: [
-            { id: 'list_1', name: 'Groceries', items: [] }
-        ],
-        activeListId: 'list_1'
-    };
-
     /**
-     * Fetch all data from localStorage
+     * Builds the starting data for a browser that has never opened the app.
+     *
+     * Educational Note: this is a *function* rather than a plain shared object on
+     * purpose. If every empty read returned the same object, the first addList()
+     * would push into that shared template and quietly corrupt the defaults for
+     * the rest of the page's life. Returning a fresh object each time avoids it.
      */
+    function createDefaultData() {
+        return {
+            lists: [
+                { id: 'list_1', name: 'Groceries', items: [] }
+            ],
+            activeListId: 'list_1'
+        };
+    }
+
     function getData() {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (!data) {
-            return defaultData;
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+            return createDefaultData();
         }
         try {
-            return JSON.parse(data);
-        } catch (e) {
-            console.error("Error parsing localStorage data:", e);
-            return defaultData;
+            return JSON.parse(raw);
+        } catch (error) {
+            console.error('Error parsing localStorage data:', error);
+            return createDefaultData();
         }
     }
 
-    /**
-     * Save full data object to localStorage
-     */
     function saveData(data) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    /** Nearly every operation below starts by locating one list inside the data. */
+    function findList(data, listId) {
+        return data.lists.find(list => list.id === listId);
+    }
+
+    /**
+     * Educational Note: Date.now() alone is not unique enough here - adding two
+     * items quickly enough lands them in the same millisecond and produces
+     * duplicate ids, which then makes edits and deletes hit the wrong row.
+     * A short random suffix makes a collision effectively impossible.
+     */
+    function createId(prefix) {
+        return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     }
 
     // --- Public API ---
 
     return {
-        /**
-         * Get all lists
-         */
-        getLists: function() {
+        getLists() {
             return getData().lists;
         },
 
-        /**
-         * Get the ID of the currently active list
-         */
-        getActiveListId: function() {
+        getList(listId) {
+            return findList(getData(), listId) || null;
+        },
+
+        getActiveListId() {
             return getData().activeListId;
         },
 
-        /**
-         * Set the active list ID
-         */
-        setActiveListId: function(id) {
+        setActiveListId(listId) {
             const data = getData();
-            data.activeListId = id;
+            data.activeListId = listId;
             saveData(data);
         },
 
         /**
-         * Add a new list
-         * @param {string} name - The name of the list
-         * @returns {string} The new list's ID
+         * @param {string} name - The name of the new list
+         * @returns {string} The new list's ID, so the caller can activate it
          */
-        addList: function(name) {
+        addList(name) {
             const data = getData();
-            const id = 'list_' + Date.now();
+            const id = createId('list');
             data.lists.push({ id, name, items: [] });
             saveData(data);
             return id;
         },
 
-        /**
-         * Rename a list by ID
-         */
-        renameList: function(id, newName) {
+        renameList(listId, newName) {
             const data = getData();
-            const list = data.lists.find(l => l.id === id);
+            const list = findList(data, listId);
             if (list) {
                 list.name = newName;
                 saveData(data);
@@ -93,84 +102,52 @@ const Store = (function() {
         },
 
         /**
-         * Delete a list by ID
+         * @returns {string|null} The ID that should now be active - deleting the
+         * active list falls back to the first remaining one, or null if none are left.
          */
-        deleteList: function(id) {
+        deleteList(listId) {
             const data = getData();
-            data.lists = data.lists.filter(list => list.id !== id);
-            
-            // If we deleted the active list, set active to the first available, or null
-            if (data.activeListId === id) {
+            data.lists = data.lists.filter(list => list.id !== listId);
+
+            if (data.activeListId === listId) {
                 data.activeListId = data.lists.length > 0 ? data.lists[0].id : null;
             }
             saveData(data);
             return data.activeListId;
         },
 
-        /**
-         * Get all items for a specific list
-         */
-        getItems: function(listId) {
+        addItem(listId, itemName) {
             const data = getData();
-            const list = data.lists.find(l => l.id === listId);
-            return list ? list.items : [];
-        },
-
-        /**
-         * Add an item to a list
-         */
-        addItem: function(listId, itemName) {
-            const data = getData();
-            const list = data.lists.find(l => l.id === listId);
+            const list = findList(data, listId);
             if (list) {
-                const item = {
-                    id: 'item_' + Date.now(),
-                    name: itemName,
-                    completed: false
-                };
-                list.items.push(item);
+                list.items.push({ id: createId('item'), name: itemName, completed: false });
                 saveData(data);
             }
         },
 
-        /**
-         * Rename an item
-         */
-        renameItem: function(listId, itemId, newName) {
+        renameItem(listId, itemId, newName) {
             const data = getData();
-            const list = data.lists.find(l => l.id === listId);
-            if (list) {
-                const item = list.items.find(i => i.id === itemId);
-                if (item) {
-                    item.name = newName;
-                    saveData(data);
-                }
+            const item = findList(data, listId)?.items.find(i => i.id === itemId);
+            if (item) {
+                item.name = newName;
+                saveData(data);
             }
         },
 
-        /**
-         * Toggle completion status of an item
-         */
-        toggleItem: function(listId, itemId) {
+        toggleItem(listId, itemId) {
             const data = getData();
-            const list = data.lists.find(l => l.id === listId);
-            if (list) {
-                const item = list.items.find(i => i.id === itemId);
-                if (item) {
-                    item.completed = !item.completed;
-                    saveData(data);
-                }
+            const item = findList(data, listId)?.items.find(i => i.id === itemId);
+            if (item) {
+                item.completed = !item.completed;
+                saveData(data);
             }
         },
 
-        /**
-         * Delete an item from a list
-         */
-        deleteItem: function(listId, itemId) {
+        deleteItem(listId, itemId) {
             const data = getData();
-            const list = data.lists.find(l => l.id === listId);
+            const list = findList(data, listId);
             if (list) {
-                list.items = list.items.filter(i => i.id !== itemId);
+                list.items = list.items.filter(item => item.id !== itemId);
                 saveData(data);
             }
         }

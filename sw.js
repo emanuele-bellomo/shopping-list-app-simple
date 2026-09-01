@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shopping-list-v1';
+const CACHE_NAME = 'shopping-list-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -40,10 +40,14 @@ self.addEventListener('activate', event => {
 
 // Fetch event: Network first, falling back to cache (for a balance of fresh data and offline support)
 self.addEventListener('fetch', event => {
+    // Only GET requests can be stored in the Cache API, so leave anything else alone.
+    if (event.request.method !== 'GET') return;
+
     event.respondWith(
         fetch(event.request)
             .then(response => {
-                // If the response is valid, clone it and update the cache
+                // If the response is valid, clone it and update the cache.
+                // A response body can only be read once, hence the clone.
                 if (response && response.status === 200 && response.type === 'basic') {
                     const responseToCache = response.clone();
                     caches.open(CACHE_NAME)
@@ -51,10 +55,7 @@ self.addEventListener('fetch', event => {
                 }
                 return response;
             })
-            .catch(() => {
-                // If network request fails, try to serve from cache
-                console.log('[Service Worker] Fetch failed, returning from cache');
-                return caches.match(event.request);
-            })
+            // If the network request fails, fall back to whatever we cached
+            .catch(() => caches.match(event.request))
     );
 });
