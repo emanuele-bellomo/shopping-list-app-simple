@@ -61,20 +61,42 @@
                 </ul>
             </nav>
 
-            <!-- Actions that apply to every list at once -->
+            <!--
+                Actions that apply to every list at once, tucked into a pop-up menu
+                so the list of lists keeps the room.
+
+                The menu comes before its button in the markup so that, once open,
+                tabbing runs down the screen in the order things are drawn: the
+                menu sits above the button it belongs to.
+            -->
             <footer class="sidebar-footer">
-                <button id="copy-lists-btn" class="secondary-btn" title="Copy every list as plain text">
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                    Copy all lists
+                <div id="list-actions-menu" class="list-actions-menu">
+                    <button id="copy-lists-btn" class="menu-item">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        Copy all lists
+                    </button>
+                    <button id="share-lists-btn" class="menu-item">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>
+                        Share all lists
+                    </button>
+                    <button id="export-lists-btn" class="menu-item">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+                        Export all lists
+                    </button>
+                    <button id="import-lists-btn" class="menu-item">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path><path d="M12 18v-6M9 15h6"></path></svg>
+                        Import lists
+                    </button>
+                </div>
+
+                <button id="list-actions-btn" class="secondary-btn list-actions-btn" aria-expanded="false" aria-controls="list-actions-menu">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>
+                    Backup &amp; share
+                    <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 15l-6-6-6 6"></path></svg>
                 </button>
-                <button id="share-lists-btn" class="secondary-btn" title="Share every list as plain text">
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"></path><path d="M16 6l-4-4-4 4"></path><path d="M12 2v13"></path></svg>
-                    Share all lists
-                </button>
-                <button id="export-lists-btn" class="secondary-btn" title="Download a backup file containing every list">
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
-                    Export all lists
-                </button>
+
+                <!-- Opened by the Import button above: a bare file input cannot be styled to match -->
+                <input type="file" id="import-file-input" accept="application/json,.json" class="hidden">
             </footer>
         </aside>
 

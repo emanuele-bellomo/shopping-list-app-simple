@@ -17,9 +17,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const listsContainer = document.getElementById('lists-container');
     const addListForm = document.getElementById('add-list-form');
     const newListInput = document.getElementById('new-list-input');
+    const listActionsBtn = document.getElementById('list-actions-btn');
+    const listActionsMenu = document.getElementById('list-actions-menu');
     const copyListsBtn = document.getElementById('copy-lists-btn');
     const shareListsBtn = document.getElementById('share-lists-btn');
     const exportListsBtn = document.getElementById('export-lists-btn');
+    const importListsBtn = document.getElementById('import-lists-btn');
+    const importFileInput = document.getElementById('import-file-input');
 
     // Items
     const currentListTitle = document.getElementById('current-list-title');
@@ -51,6 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
         edit: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
         close: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M6 18L18 6M6 6l12 12"></path></svg>'
     };
+
+    // Backup files carry this number so a future format change can be detected.
+    const BACKUP_VERSION = 1;
 
     // === Application State ===
     let activeListId = Store.getActiveListId();
@@ -350,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const exportedAt = new Date().toISOString();
         const backup = {
             app: 'shopping-list',
-            version: 1,
+            version: BACKUP_VERSION,
             exportedAt,
             lists: Store.getLists()
         };
@@ -364,6 +371,83 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Shares every list at once as one readable block of plain text. */
     function shareAllLists() {
         return shareText('My Shopping Lists', formatAllListsAsText());
+    }
+
+    /** "1 list" / "3 lists", so the messages below read properly either way. */
+    function countLists(total) {
+        return total === 1 ? '1 list' : `${total} lists`;
+    }
+
+    /** True when a parsed file carries the marker fields our exports write. */
+    function isBackupFile(parsed) {
+        return Boolean(parsed) && parsed.app === 'shopping-list' && Array.isArray(parsed.lists);
+    }
+
+    /**
+     * Rebuilds the lists from a backup field by field.
+     *
+     * Educational Note: the file comes from outside the app, so nothing in it is
+     * trusted. Copying only the fields we expect - and dropping anything of the
+     * wrong shape - means a hand-edited or unrelated JSON file cannot smuggle
+     * unexpected data into localStorage.
+     */
+    function sanitizeLists(rawLists) {
+        return rawLists
+            .filter(list => list && typeof list.name === 'string' && Array.isArray(list.items))
+            .map(list => ({
+                name: list.name,
+                items: list.items
+                    .filter(item => item && typeof item.name === 'string')
+                    .map(item => ({ name: item.name, completed: item.completed === true }))
+            }));
+    }
+
+    /**
+     * Reads a backup file the user picked and adds its lists to the ones already
+     * stored. Existing lists are never touched - see Store.importLists().
+     */
+    async function importListsFromFile(file) {
+        let parsed;
+        try {
+            parsed = JSON.parse(await file.text());
+        } catch (error) {
+            alert('That file could not be read. Pick a backup file exported from this app.');
+            return;
+        }
+
+        if (!isBackupFile(parsed)) {
+            alert('That file is not a Shopping List backup.');
+            return;
+        }
+        if (parsed.version > BACKUP_VERSION) {
+            alert('That backup was made by a newer version of this app, so it cannot be read here.');
+            return;
+        }
+
+        const lists = sanitizeLists(parsed.lists);
+        if (lists.length === 0) {
+            alert('That backup does not contain any lists.');
+            return;
+        }
+
+        const existingCount = Store.getLists().length;
+        const question = existingCount > 0
+            ? `Add ${countLists(lists.length)} to your existing ${countLists(existingCount)}? Nothing will be replaced.`
+            : `Import ${countLists(lists.length)}?`;
+        if (!confirm(question)) return;
+
+        try {
+            activeListId = Store.importLists(lists);
+        } catch (error) {
+            // localStorage is capped at a few megabytes per site. Nothing is saved
+            // when it overflows, so the existing lists survive untouched.
+            console.error('Import failed:', error);
+            alert('There was not enough storage space to import these lists.');
+            return;
+        }
+
+        render();
+        alert(`Imported ${countLists(lists.length)}.`);
     }
 
     // === Event Listeners ===
@@ -417,12 +501,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Sidebar actions covering every list at once
-        copyListsBtn.addEventListener('click', () => {
-            copyText(formatAllListsAsText(), 'All lists copied to clipboard!');
+        // Sidebar menu holding the actions that cover every list at once
+        listActionsBtn.addEventListener('click', (e) => {
+            // Without this the document listener below would see the same click
+            // and close the menu again the instant it opened.
+            e.stopPropagation();
+            if (isListActionsOpen()) closeListActions(); else openListActions();
         });
-        shareListsBtn.addEventListener('click', shareAllLists);
-        exportListsBtn.addEventListener('click', exportAllLists);
+
+        // Clicking anywhere else, or pressing Escape, dismisses the menu
+        document.addEventListener('click', (e) => {
+            if (!listActionsMenu.contains(e.target)) closeListActions();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isListActionsOpen()) {
+                closeListActions();
+                listActionsBtn.focus(); // Return the keyboard to where the menu came from
+            }
+        });
+
+        copyListsBtn.addEventListener('click', menuAction(() => {
+            copyText(formatAllListsAsText(), 'All lists copied to clipboard!');
+        }));
+        shareListsBtn.addEventListener('click', menuAction(shareAllLists));
+        exportListsBtn.addEventListener('click', menuAction(exportAllLists));
+
+        // The styled menu item stands in for the file input, which stays hidden
+        importListsBtn.addEventListener('click', menuAction(() => importFileInput.click()));
+        importFileInput.addEventListener('change', async () => {
+            const file = importFileInput.files[0];
+            if (file) await importListsFromFile(file);
+            // Clearing the value lets the same file be picked again later:
+            // without this, re-selecting it fires no change event.
+            importFileInput.value = '';
+        });
 
         // Mobile Sidebar Toggles
         menuBtn.addEventListener('click', openSidebar);
@@ -438,5 +551,35 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeSidebar() {
         sidebar.classList.remove('open');
         sidebarOverlay.classList.remove('show');
+        closeListActions(); // Never leave the menu hanging open behind the drawer
+    }
+
+    // === Whole-collection actions menu ===
+
+    function isListActionsOpen() {
+        return listActionsMenu.classList.contains('open');
+    }
+
+    function openListActions() {
+        listActionsMenu.classList.add('open');
+        // Screen readers announce the button as expanded, and the CSS turns the
+        // chevron over, both driven by this one attribute.
+        listActionsBtn.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeListActions() {
+        listActionsMenu.classList.remove('open');
+        listActionsBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    /**
+     * Wraps a menu action so the menu always closes before it runs. Actions open
+     * dialogs and share sheets, and leaving the menu behind them looks broken.
+     */
+    function menuAction(action) {
+        return () => {
+            closeListActions();
+            action();
+        };
     }
 });

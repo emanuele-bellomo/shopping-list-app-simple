@@ -59,6 +59,22 @@ const Store = (function () {
         return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     }
 
+    /**
+     * Returns a name that is not in `taken` yet, marking imported copies so an
+     * existing list of the same name stays recognisable next to them.
+     */
+    function uniqueName(name, taken) {
+        if (!taken.has(name)) return name;
+
+        let candidate = `${name} (imported)`;
+        let counter = 2;
+        while (taken.has(candidate)) {
+            candidate = `${name} (imported ${counter})`;
+            counter++;
+        }
+        return candidate;
+    }
+
     // --- Public API ---
 
     return {
@@ -90,6 +106,45 @@ const Store = (function () {
             data.lists.push({ id, name, items: [] });
             saveData(data);
             return id;
+        },
+
+        /**
+         * Adds lists from a backup file alongside the ones already stored.
+         *
+         * This is deliberately additive: nothing existing is overwritten, merged
+         * or removed, because there is no server-side copy and no undo, so a
+         * destructive import would be unrecoverable for the user. Imported
+         * entries get brand new IDs rather than the ones in the file - an ID
+         * that collided with a stored list would make a later edit or delete
+         * act on the wrong one.
+         *
+         * @param {Array} lists - Validated lists, each with a name and items
+         * @returns {string} The ID that should be active after importing
+         */
+        importLists(lists) {
+            const data = getData();
+            const takenNames = new Set(data.lists.map(list => list.name));
+
+            lists.forEach(incoming => {
+                const name = uniqueName(incoming.name, takenNames);
+                takenNames.add(name);
+                data.lists.push({
+                    id: createId('list'),
+                    name,
+                    items: incoming.items.map(item => ({
+                        id: createId('item'),
+                        name: item.name,
+                        completed: item.completed
+                    }))
+                });
+            });
+
+            // On a device with nothing saved yet, land on the first imported list.
+            if (!data.lists.some(list => list.id === data.activeListId)) {
+                data.activeListId = data.lists[0].id;
+            }
+            saveData(data);
+            return data.activeListId;
         },
 
         renameList(listId, newName) {
