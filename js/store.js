@@ -205,6 +205,25 @@ const Store = (function () {
                 list.items = list.items.filter(item => item.id !== itemId);
                 saveData(data);
             }
+        },
+
+        reorderLists(oldIndex, newIndex) {
+            const data = getData();
+            if (oldIndex >= 0 && oldIndex < data.lists.length && newIndex >= 0 && newIndex < data.lists.length) {
+                const [movedList] = data.lists.splice(oldIndex, 1);
+                data.lists.splice(newIndex, 0, movedList);
+                saveData(data);
+            }
+        },
+
+        reorderItems(listId, oldIndex, newIndex) {
+            const data = getData();
+            const list = findList(data, listId);
+            if (list && oldIndex >= 0 && oldIndex < list.items.length && newIndex >= 0 && newIndex < list.items.length) {
+                const [movedItem] = list.items.splice(oldIndex, 1);
+                list.items.splice(newIndex, 0, movedItem);
+                saveData(data);
+            }
         }
     };
 })();

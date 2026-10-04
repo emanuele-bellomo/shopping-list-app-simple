@@ -432,8 +432,48 @@ button:disabled:active {
     margin-top: 0.5rem;
 }
 
-/*
+/* Drag and Drop Styles */
+.drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none; /* Prevent scroll on touch devices */
+    transition: color var(--transition-speed);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.drag-handle:hover {
+    color: var(--text-primary);
+}
+
+.dragging {
+    opacity: 0.9;
+    transform: scale(1.02);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    background: var(--bg-tertiary) !important;
+    border-color: var(--accent-primary) !important;
+    z-index: 1000;
+    pointer-events: none; /* Let pointer events pass through to placeholder/items */
+}
+
+.placeholder {
+    background: rgba(255, 255, 255, 0.02);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius);
+    margin: 0.25rem 0;
+    visibility: visible !important;
+    opacity: 0.5;
+}
+
+/* 
  * Install Banner
+
  *
  * It collapses to zero height rather than using the .hidden utility class, so it
  * can animate open and closed while still taking up no room when it is away.

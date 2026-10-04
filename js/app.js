@@ -53,7 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const ICONS = {
         trash: '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg>',
         edit: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
-        close: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M6 18L18 6M6 6l12 12"></path></svg>'
+        close: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M6 18L18 6M6 6l12 12"></path></svg>',
+        drag: '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 8h16M4 16h16"></path></svg>'
     };
 
     // Backup files carry this number so a future format change can be detected.
@@ -70,6 +71,17 @@ document.addEventListener('DOMContentLoaded', () => {
         registerServiceWorker();
         setupPwaInstall();
         setupEventListeners();
+
+        makeSortable(listsContainer, (oldIndex, newIndex) => {
+            Store.reorderLists(oldIndex, newIndex);
+            renderLists();
+        });
+
+        makeSortable(itemsContainer, (oldIndex, newIndex) => {
+            Store.reorderItems(activeListId, oldIndex, newIndex);
+            renderActiveList();
+        });
+
         render();
     }
 
@@ -150,6 +162,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeSidebar(); // Close on mobile after selection
             });
 
+            const dragHandle = document.createElement('span');
+            dragHandle.className = 'drag-handle';
+            dragHandle.innerHTML = ICONS.drag;
+            // Prevent list activation when dragging
+            dragHandle.addEventListener('click', (e) => e.stopPropagation());
+
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'icon-btn danger';
             deleteBtn.innerHTML = ICONS.trash;
@@ -165,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+            li.appendChild(dragHandle);
             li.appendChild(span);
             li.appendChild(deleteBtn);
             listsContainer.appendChild(li);
@@ -246,6 +265,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderActiveList();
             });
 
+            const dragHandle = document.createElement('span');
+            dragHandle.className = 'drag-handle';
+            dragHandle.innerHTML = ICONS.drag;
+
+            li.appendChild(dragHandle);
             li.appendChild(checkbox);
             li.appendChild(span);
             li.appendChild(editBtn);
@@ -581,5 +605,121 @@ document.addEventListener('DOMContentLoaded', () => {
             closeListActions();
             action();
         };
+    }
+
+    // === Drag and Drop Utilities ===
+    
+    /**
+     * Makes a list container sortable via drag and drop using pointer events.
+     * Educational Note: We use pointer events (pointerdown, pointermove, pointerup) 
+     * instead of native HTML5 drag-and-drop to ensure seamless support on both 
+     * desktop (mouse) and mobile (touch) devices without any external libraries.
+     */
+    function makeSortable(container, onUpdate) {
+        let draggingEle;
+        let draggingEleIndex;
+        let placeholder;
+        let isDragging = false;
+        let startY = 0;
+        let initialTop = 0;
+        
+        container.addEventListener('pointerdown', function(e) {
+            // Only allow left click / touch
+            if (e.button !== 0 && e.pointerType === 'mouse') return; 
+            const handle = e.target.closest('.drag-handle');
+            if (!handle) return;
+            
+            draggingEle = handle.closest('li');
+            if (!draggingEle) return;
+            
+            e.preventDefault(); // Prevent text selection/scrolling
+            
+            draggingEleIndex = Array.from(container.children).indexOf(draggingEle);
+            
+            placeholder = document.createElement('li');
+            placeholder.className = draggingEle.className + ' placeholder';
+            placeholder.style.height = draggingEle.offsetHeight + 'px';
+            
+            isDragging = true;
+            startY = e.clientY;
+            
+            const rect = draggingEle.getBoundingClientRect();
+            initialTop = rect.top;
+            
+            draggingEle.style.width = rect.width + 'px';
+            draggingEle.style.height = rect.height + 'px';
+            draggingEle.style.position = 'fixed';
+            draggingEle.style.top = initialTop + 'px';
+            draggingEle.style.left = rect.left + 'px';
+            draggingEle.classList.add('dragging');
+            
+            container.insertBefore(placeholder, draggingEle.nextSibling);
+            
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+            document.addEventListener('pointercancel', onPointerUp);
+        });
+        
+        function onPointerMove(e) {
+            if (!isDragging) return;
+            e.preventDefault(); // Prevent scroll on touch devices during drag
+            
+            const dy = e.clientY - startY;
+            draggingEle.style.top = (initialTop + dy) + 'px';
+            
+            // Find which item we are hovering over
+            const rect = draggingEle.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            
+            // Temporarily hide dragging element to get the element underneath
+            draggingEle.style.display = 'none';
+            const elementBelow = document.elementFromPoint(x, y);
+            draggingEle.style.display = '';
+            
+            if (!elementBelow) return;
+            
+            const droppableBelow = elementBelow.closest('li:not(.dragging):not(.placeholder)');
+            
+            if (droppableBelow && droppableBelow.parentNode === container) {
+                const rectBelow = droppableBelow.getBoundingClientRect();
+                const isAbove = y < rectBelow.top + rectBelow.height / 2;
+                
+                if (isAbove) {
+                    container.insertBefore(placeholder, droppableBelow);
+                } else {
+                    container.insertBefore(placeholder, droppableBelow.nextSibling);
+                }
+            }
+        }
+        
+        function onPointerUp(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            // Reset styles
+            draggingEle.style.position = '';
+            draggingEle.style.top = '';
+            draggingEle.style.left = '';
+            draggingEle.style.width = '';
+            draggingEle.style.height = '';
+            draggingEle.classList.remove('dragging');
+            
+            // Swap with placeholder
+            container.insertBefore(draggingEle, placeholder);
+            container.removeChild(placeholder);
+            
+            const newIndex = Array.from(container.children).indexOf(draggingEle);
+            
+            // Clean up event listeners
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+            document.removeEventListener('pointercancel', onPointerUp);
+            
+            // Trigger update if index changed
+            if (newIndex !== draggingEleIndex && onUpdate) {
+                onUpdate(draggingEleIndex, newIndex);
+            }
+        }
     }
 });
